@@ -25,6 +25,8 @@
   "type": "module",
   "dependencies": {
     "commander": "^12.1.0",
-    "web3protocol": "^0.6.1"
+    "express": "^4.21.1",
+    "web3protocol": "^0.6.1",
+    "winston": "^3.16.0"
   }
 }
