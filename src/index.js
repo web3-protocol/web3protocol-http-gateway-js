@@ -6,6 +6,7 @@ import express from 'express'
 import winston from 'winston'
 
 import { patchHTMLFile } from './patch.js';
+import { setPageCache, getPageCache, hasPageCache, deletePageCache } from './page-cache.js';
 
 
 // Get the package.json file
@@ -77,7 +78,8 @@ web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56=mywebsite.com`)
   .addOption(
     new CommanderOption(
       '--force-cache', 
-      'All web3:// calls will be cached aggressively even if the website does not ask for it. Used to avoid RPC calls; only do this if you are aware of the consequences.')
+      'All web3:// calls will be cached indefinitely even if the website does not ask for it. Used to avoid RPC calls; only do this if you are aware of the consequences.')
+      .default(false)
       .env('FORCE_CACHE'))
   .addOption(
     new CommanderOption(
@@ -270,6 +272,21 @@ app.get('*', async (req, res) => {
   // Create the matching web3:// URL
   const web3Url = servedWeb3Website.baseWeb3Url + req.path
 
+  // If the forceCache option is on: If the page is in cache, return the cache
+  if(options.forceCache) {
+    if(hasPageCache(web3Url)) {
+      const pageCache = getPageCache(web3Url);
+      res.status(pageCache.httpCode)
+      Object.entries(pageCache.httpHeaders).forEach(([key, value]) => {
+        res.setHeader(key, value);
+      });
+      res.write(pageCache.output);
+      res.end();
+      logger.info(req.hostname + ' ' + req.path + ' 200 (from cache)')
+      return
+    }
+  }
+
   // Make the call to the web3:// website
   try {
     const fetchedWeb3Url = await web3Client.fetchUrl(web3Url)
@@ -291,6 +308,7 @@ app.get('*', async (req, res) => {
     // Send the response body
     const reader = fetchedWeb3Url.output.getReader();
     let chunkNumber = 0;
+    let body = Uint8Array.of(); // Will be filled if we want to cache it
     while (true) {
       let { done, value } = await reader.read();
 
@@ -305,6 +323,14 @@ app.get('*', async (req, res) => {
         // Write the chunk to the response
         res.write(value);
 
+        // If the forceCache option is on, we fill the body buffer, to save it later
+        if(options.forceCache) {
+          let newBody = new Uint8Array(body.length + value.length);
+          newBody.set(body);
+          newBody.set(value, body.length);
+          body = newBody;
+        }
+
         chunkNumber++;
       }
 
@@ -312,6 +338,15 @@ app.get('*', async (req, res) => {
       if (done) {
         break;
       }
+    }
+
+    // If the forceCache option is on, save the body in cache
+    if(options.forceCache) {
+      setPageCache(web3Url, {
+        httpCode: fetchedWeb3Url.httpCode,
+        httpHeaders: fetchedWeb3Url.httpHeaders,
+        output: body
+      })
     }
 
     res.end();
