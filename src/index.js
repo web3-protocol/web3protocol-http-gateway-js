@@ -86,6 +86,7 @@ web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56=mywebsite.com`)
 1=https://eth-mainnet.alchemyapi.io/v2/<your_api_key> : override the RPC for chain id 1 (Ethereum mainnet)
 123456789=http://127.0.0.1:8545 : Set the RPC for non-existing chain id 123456789`)
       .env('CHAIN_RPC')
+      .default([])
       .argParser((val, previousVal) => {
         // If val is multiple values (can happen if used via the CHAIN_RPC env variable), split them
         let vals = val.split(' ').filter(v => v.trim() !== '');
@@ -202,8 +203,51 @@ const logger = winston.createLogger({
 });
 
 
-// Prepare the Web3 client
+// Prepare the web3 client
+// Prepare the chain list, include the overrides
 const chainList = getDefaultChainList()
+
+// Overrides: Group by chain id
+let chainOverrides = []
+options.chainRpc.map(chainRPC => {
+  // Find if chain is already overriden
+  let alreadyDefinedChainOverride = Object.entries(chainOverrides).find(chainOverride => chainOverride[1].id == chainRPC.chainId) || null
+
+  // If already exist, add the RPC to the list
+  if(alreadyDefinedChainOverride) {
+    chainOverrides[alreadyDefinedChainOverride[0]].rpcUrls.push(chainRPC.rpcUrl)
+  }
+  // If does not exist, create it
+  else {
+    let chainOverride = {
+      id: chainRPC.chainId,
+      rpcUrls: [chainRPC.rpcUrl]
+    }
+    chainOverrides.push(chainOverride)
+  }
+})
+
+// Add the overrides on the main chain list
+chainOverrides.map(chainOverride => {
+  // Find if the chain already exist
+  let alreadyDefinedChain = Object.entries(chainList).find(chain => chain[1].id == chainOverride.id) || null
+
+  // If it exists, override RPCs
+  if(alreadyDefinedChain) {
+    chainList[alreadyDefinedChain[0]].rpcUrls = [...chainOverride.rpcUrls]
+  }
+  // If does not exist, create it
+  else {
+    let newChain = {
+      id: chainOverride.id,
+      name: 'custom-' + chainOverride.id,
+      rpcUrls: [...chainOverride.rpcUrls],
+    }
+    chainList.push(newChain)
+  }
+})
+
+// Create the Web3 client
 const web3Client = new Web3Client(chainList)
 
 
