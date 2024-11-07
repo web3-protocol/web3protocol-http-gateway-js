@@ -5,6 +5,8 @@ import { getDefaultChainList } from 'web3protocol/chains';
 import express from 'express'
 import winston from 'winston'
 
+import { patchHTMLFile } from './patch.js';
+
 
 // Get the package.json file
 // import pkg from '../package.json' with { type: 'json' };
@@ -20,7 +22,7 @@ program
   .version(pkg.version);
 
 program
-  .argument('<web3:// website address[=DNS domain]...>', 
+  .argument('<web3-website-address[=DNS-domain]...>', 
     `web3:// website to be served by the gateway, with an optional DNS domain. DNS domains are required if serving multiple web3:// websites, or if using SSL certificate generation. Examples:
 web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56
 web3://0x10fE786Dc7Cb9527197C24c53d7330D3db329524:11155111
@@ -41,6 +43,19 @@ web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56=mywebsite.com`)
           throw new CommanderInvalidArgumentError('Port number out of range.');
         }
         return parsedValue;
+      }))
+  .addOption(
+    new CommanderOption(
+      '-g, --global-web3-http-gateway-dns-domain <DNS-domain>', 
+      'The DNS domain of the web3:// HTTP gateway to use for all web3:// calls that are not handled by this gateway')
+      .env('GLOBAL_WEB3_HTTP_GATEWAY_DNS_DOMAIN')
+      .default('web3gateway.dev')
+      .argParser(val => {
+        // Ensure this is a valid domain name
+        if (!val.match(/^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*(\.[a-z]{2,20})?$/)) {
+          throw new CommanderInvalidArgumentError('Invalid domain name.');
+        }
+        return val;
       }))
   // .addOption(
   //   new CommanderOption(
@@ -199,17 +214,17 @@ app.get('*', async (req, res) => {
   // - If there is more than 1 served website, or there is only one, but configured with a DNS domain, 
   //   find the one matching the DNS domain
   // - Otherwise, use the only one inconditionally
-  const servedWebsite = servedWeb3Websites.length > 1 || servedWeb3Websites[0].dnsDomain ? 
+  const servedWeb3Website = servedWeb3Websites.length > 1 || servedWeb3Websites[0].dnsDomain ? 
     servedWeb3Websites.find(website => website.dnsDomain === req.hostname) : 
     servedWeb3Websites[0];
-  if (!servedWebsite) {
-    res.status(503).send('No web3:// website found for this domain :' + req.hostname);
+  if (!servedWeb3Website) {
+    res.status(503).send('No web3:// website found for this domain : ' + req.hostname);
     logger.info(req.hostname + ' ' + req.path + ' 503')
     return
   }
 
   // Create the matching web3:// URL
-  const web3Url = servedWebsite.baseWeb3Url + req.path
+  const web3Url = servedWeb3Website.baseWeb3Url + req.path
 
   // Make the call to the web3:// website
   try {
@@ -224,48 +239,24 @@ app.get('*', async (req, res) => {
     });
 
     // Determine the content type of the response
-    const contentType = Object.keys(fetchedWeb3Url.httpHeaders).find(key => key.toLowerCase() === 'content-type');
-    
+    const contentType = Object.entries(fetchedWeb3Url.httpHeaders).find(([key, value]) => key.toLowerCase() === 'content-type')?.[1];
+
+    // Determine the content encoding of the response
+    const contentEncoding = Object.entries(fetchedWeb3Url.httpHeaders).find(([key, value]) => key.toLowerCase() === 'content-encoding')?.[1];
+
     // Send the response body
     const reader = fetchedWeb3Url.output.getReader();
     let chunkNumber = 0;
     while (true) {
-      const { done, value } = await reader.read();
-console.log(value)
-console.log(typeof value)
+      let { done, value } = await reader.read();
+
       // We got a chunk
       if(value) {
         // First chunk: If the content type is text/html, we inject some javascript which 
         // handle conversion of web3:// URLs to http:// gateway URLs
         if(chunkNumber == 0 && contentType && contentType.toLowerCase().startsWith('text/html')) {
-          const injectedJavascript = `
-            <script>
-              document.addEventListener('DOMContentLoaded', function() {
-                var web3UrlRegex = /web3:\\/\\/(0x[0-9a-fA-F]{40})(?::([1-9][0-9]*))?/g;
-                document.body.innerHTML = document.body.innerHTML.replace(web3UrlRegex, function(match, address, chainId) {
-                  var newUrl = 'http://' + window.location.hostname + ':' + window.location.port + '/web3/' + address + (chainId ? ':' + chainId : '');
-                  return '<a href="' + newUrl + '">' + match + '</a>';
-                });
-              });
-            </script>
-          `;
-          // Read the first chunk as text,  
+          value = await patchHTMLFile(value, contentEncoding, servedWeb3Websites, options.globalWeb3HttpGatewayDnsDomain)
         }
-
-        // // First chunk: Detect: if output is non-utf8 and not output target was
-        // // specified, ask for confirmation before printing on console
-        // if(chunkNumber == 0) {
-        //   // Try to decode as utf8 text
-        //   let outputStr = new TextDecoder('utf-8').decode(value)
-
-        //   // If we have "replacement character" (U+FFFD), then it has bad utf8
-        //   if(outputStr.indexOf("�") !== -1 && args.output === undefined) {
-        //     process.stderr.write('Warning: Binary output can mess up your terminal. Use "--output -" to tell\n' +
-        //       'Warning: web3curl to output it to your terminal anyway, or consider "--output\n' + 
-        //       'Warning: <FILE>" to save to a file.\n')
-        //     process.exit(1);
-        //   }
-        // }
 
         // Write the chunk to the response
         res.write(value);
@@ -281,21 +272,14 @@ console.log(typeof value)
 
     res.end();
 
-
-
-
     logger.info(req.hostname + ' ' + req.path + ' ' + fetchedWeb3Url.httpCode)
+
+  // Handle errors
   } catch (error) {
     res.status(503).send('Error fetching the web3:// website: ' + error.message);
     logger.info(req.hostname + ' ' + req.path + ' 503')
     return
   }
-
-
-
-  
-  
-
 })
 
 console.log('Listening on port ' + options.port)
