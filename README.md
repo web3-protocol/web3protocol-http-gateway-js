@@ -20,19 +20,26 @@ will serve the `web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E` website at `h
 
 ## Installation
 
-Transparent installation :
+#### Transparent installation
 
 ```bash
 npx web3protocol-http-gateway web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E
 ```
 
-Global installation :
+#### Global installation
 
 ```bash
 npm install -g web3protocol-http-gateway
 web3protocol-http-gateway web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E
 ```
 
+#### With docker
+
+```bash
+docker compose up
+```
+
+The `docker-compose.yml` file contains documentation on how to configure it.
 
 ## Options 
 
