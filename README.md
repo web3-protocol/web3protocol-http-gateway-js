@@ -39,7 +39,7 @@ web3protocol-http-gateway web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E
 docker compose up
 ```
 
-The `docker-compose.yml` file contains documentation on how to configure it.
+With docker, the default configured port is 80. The `docker-compose.yml` file contains documentation on how to configure all the options.
 
 ## Options 
 
@@ -52,6 +52,10 @@ web3protocol-http-gateway web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E=terr
 ```
 
 If you then configure `ocweb.com` and `terraformnavigator.com` to point to your server, they will deliver their respective `web3://` website.
+
+### Using HTTPS with Let's Encrypt
+
+If you want HTTPS support, use the `--lets-encrypt-enable-https` option, and fill your email with the `--lets-encrypt-email <email>` option (required by the Let"s Encrypt service). HTTPS certificate will then be generated at startup, and will be renewed automatically.
 
 ### Override chain RPCs
 
