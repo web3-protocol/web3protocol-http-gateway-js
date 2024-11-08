@@ -1,0 +1,30 @@
+services:
+  server:
+    build:
+      context: .
+    # Add the options and web3:// websites to serve here
+    # As an example, we serve web3://ocweb.eth
+    command: web3://ocweb.eth
+    # You can serve multiple website this way (require a DNS domain per website): 
+    # command: web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E=terraformnavitagor.com web3://ocweb.eth=ocweb.com
+    ports:
+      - 8080:8080
+    environment:
+      NODE_ENV: production
+
+      #
+      # You can configure options via environment variables as well :
+      #
+
+      # Update the port here. Don't forget to update the port in the ports section as well
+      # PORT: 5555
+
+      # Force cache
+      # FORCE_CACHE: true
+
+      # Add/override chain RPCs
+      # CHAIN_RPC: 1=https://eth-mainnet.alchemyapi.io/v2/XXX 123456789=http://127.0.0.1:8545
+
+      # Update the root domain of the global web3:// gateway to use when a website is not served
+      # by this gateway
+      # GLOBAL_WEB3_HTTP_GATEWAY_DNS_DOMAIN: web3gateway.dev
