@@ -33,6 +33,27 @@ function getDomainCertPaths(domain) {
   };
 }
 
+// Function to check if the certificate needs renewal
+async function needsRenewal(certPath, thresholdDays, domain) {
+  try {
+    const certData = await fs.readFile(certPath);
+    const certInfo = acme.crypto.readCertificateInfo(certData);
+    const now = new Date();
+    const expiryDate = certInfo.notAfter;
+    const daysUntilExpiry = (expiryDate - now) / (1000 * 60 * 60 * 24);
+    
+    const roundedDaysUntilExpiry = Math.round(daysUntilExpiry);
+    console.log(`Certificate for ${domain} expires in ${roundedDaysUntilExpiry} days`);
+
+    return daysUntilExpiry <= thresholdDays;
+  } catch (error) {
+    console.error(`Error reading certificate for expiry check:`, error);
+    // If we can't read the certificate, there must be a bug, let's not spam
+    // renewal requests
+    return false; 
+  }
+}
+
 // Function to get or renew the certificate for a specific domain
 async function getOrRenewCertificate(app, domain, letsencryptEmail) {
   const { privateKeyPath, certPath/**, fullchainPath*/ } = getDomainCertPaths(domain);
@@ -45,8 +66,17 @@ async function getOrRenewCertificate(app, domain, letsencryptEmail) {
     const key = await fs.readFile(privateKeyPath);
     const cert = await fs.readFile(certPath);
     // const fullchain = await fs.readFile(fullchainPath);
-    console.log(`Certificate for ${domain} found, using existing certificate.`);
-    return { key, cert/**, fullchain */ };
+    
+    // Check if the certificate needs renewal
+    const renewalRequired = await needsRenewal(certPath, 30, domain);
+
+    // No renewal required? Return the existing certificate
+    if (!renewalRequired) {
+      console.log(`Certificate for ${domain} found, using existing certificate.`);
+      return { key, cert/**, fullchain */ };
+    }
+      
+    console.log(`Certificate for ${domain} found, but it needs renewal. Renewing...`);
   } catch (error) {
     console.log(`Certificate for ${domain} not found, creating a new one...`);
   }
@@ -134,12 +164,13 @@ async function startHTTPSServer(app, port, domains, letsencryptEmail) {
     // Schedule a certificate renewal check for each domain every day
     setInterval(async () => {
       for (const domain of domains) {
+        console.log(`Checking certificate renewal for ${domain}...`);
         try {
-          const { cert: newCert } = await getOrRenewCertificate(app, domain, letsencryptEmail);
-          secureContexts[domain].setSecureContext({ cert: newCert });
-          console.log(`Certificate for ${domain} renewed and updated.`);
+          const { cert: newCert, key: newKey } = await getOrRenewCertificate(app, domain, letsencryptEmail);
+          secureContexts[domain] = tls.createSecureContext({ key: newKey, cert: newCert });
+          console.log(`Certificate renewal for ${domain} checked`);
         } catch (err) {
-          console.error(`Error during certificate renewal for ${domain}:`, err);
+          console.error(`Error during certificate renewal check for ${domain}:`, err);
         }
       }
     }, 24 * 60 * 60 * 1000); // Check every 24 hours
