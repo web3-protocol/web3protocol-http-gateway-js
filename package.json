@@ -1,6 +1,6 @@
 {
   "name": "web3protocol-http-gateway",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An HTTPS gateway for your ERC-4804/6860 web3:// website",
   "main": "src/index.js",
   "scripts": {
