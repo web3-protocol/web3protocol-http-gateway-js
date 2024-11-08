@@ -20,6 +20,8 @@ will serve the `web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E` website at `h
 
 ## Installation
 
+Transparent installation :
+
 ```bash
 npx web3protocol-http-gateway web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E
 ```
