@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Command, Option as CommanderOption, InvalidArgumentError as CommanderInvalidArgumentError } from 'commander';
 import { createRequire } from "module";
 import { Client as Web3Client } from 'web3protocol';
