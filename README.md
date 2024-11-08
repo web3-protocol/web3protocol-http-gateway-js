@@ -77,7 +77,9 @@ Your website(s) may point to an URL which is not served by your HTTP gateway. In
 
 By default, the gateway listen to the `8080` port. If you wish to change it, you can use the `-p, --port <number>` option.
 
-## Page alterations by the gateway
+## Page content patching by the gateway
 
-HTML pages may have absolute `web3://` links to resources, which your browser will not process. In order to fix that, some javascript code is injected into served HTML pages, that will transform `web3://` URLs into their gateway `http://` equivalent.
+HTML pages may have absolute `web3://` links to resources (in `<a>`, `<script>`, `<img>`, ... tags), which your browser will not process. 
+
+In order to fix that, some javascript code is injected into served HTML pages, that will transform `web3://` URLs into their gateway `http://` equivalent.
 
