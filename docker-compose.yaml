@@ -2,13 +2,14 @@ services:
   server:
     build:
       context: .
-    # Add the options and web3:// websites to serve here
+    # Add the command line options and web3:// websites to serve here
     # As an example, we serve web3://ocweb.eth
-    command: web3://ocweb.eth
-    # You can serve multiple website this way (require a DNS domain per website): 
+    # You can also serve multiple website this way (require a DNS domain per website): 
     # command: web3://0xAD41bf1c7f22F0ec988DaC4C0aE79119Cab9BB7E=terraformnavitagor.com web3://ocweb.eth=ocweb.com
+    command: web3://ocweb.eth
     ports:
-      - 8080:8080
+      - 80:80
+      # - 443:443 # Uncomment if you enable HTTPS
     environment:
       NODE_ENV: production
 
@@ -17,7 +18,7 @@ services:
       #
 
       # Update the port here. Don't forget to update the port in the ports section as well
-      # PORT: 5555
+      PORT: 80
 
       # Force cache
       # FORCE_CACHE: true
@@ -28,3 +29,9 @@ services:
       # Update the root domain of the global web3:// gateway to use when a website is not served
       # by this gateway
       # GLOBAL_WEB3_HTTP_GATEWAY_DNS_DOMAIN: web3gateway.dev
+
+      # Enable HTTPS with Let's Encrypt
+      # Don't forget to update the ports section, and add DNS domains to your web3:// website in
+      # the command section (e.g. web3://ocweb.eth=ocweb.com)
+      # LETSENCRYPT_ENABLE_HTTPS: true
+      # LETSENCRYPT_EMAIL: <your-email> # Required by Let's Encrypt

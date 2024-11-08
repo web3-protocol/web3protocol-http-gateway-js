@@ -28,6 +28,9 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 # Run the application as a non-root user.
 USER node
 
+RUN mkdir -p /home/node/.config/web3protocol-http-gateway/certs
+VOLUME ["/home/node/.config/web3protocol-http-gateway/certs"]
+
 # Copy the rest of the source files into the image.
 COPY . .
 

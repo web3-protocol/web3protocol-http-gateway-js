@@ -9,6 +9,7 @@ import winston from 'winston'
 
 import { patchHTMLFile } from './patch.js';
 import { setPageCache, getPageCache, hasPageCache, deletePageCache } from './page-cache.js';
+import { startHTTPSServer } from './letsencrypt.js';
 
 
 // Get the package.json file
@@ -60,23 +61,25 @@ web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56=mywebsite.com`)
         }
         return val;
       }))
-  // .addOption(
-  //   new CommanderOption(
-  //     '--lets-encrypt-enable-https', 
-  //     'Enable HTTPS with Let\'s Encrypt SSL certificates')
-  //     .env('LETSENCRYPT_ENABLE_HTTPS'))
-  // .addOption(
-  //   new CommanderOption(
-  //     '--lets-encrypt-email <email>', 
-  //     'Email for the Let\'s Encrypt SSL certificate generation')
-  //     .env('LETSENCRYPT_EMAIL')
-  //     .argParser(val => {
-  //       // Ensure the email is valid
-  //       if (!val.match(/^.+@.+\..+$/)) {
-  //         throw new CommanderInvalidArgumentError('Invalid email address.');
-  //       }
-  //       return val;
-  //     }))
+  .addOption(
+    new CommanderOption(
+      '--lets-encrypt-enable-https', 
+      'Enable HTTPS with Let\'s Encrypt SSL certificates')
+      .default(false)
+      .env('LETSENCRYPT_ENABLE_HTTPS'))
+  .addOption(
+    new CommanderOption(
+      '--lets-encrypt-email <email>', 
+      'Email for the Let\'s Encrypt SSL certificate generation')
+      .env('LETSENCRYPT_EMAIL')
+      .default('')
+      .argParser(val => {
+        // Ensure the email is valid
+        if (!val.match(/^.+@.+\..+$/)) {
+          throw new CommanderInvalidArgumentError('Invalid email address.');
+        }
+        return val;
+      }))
   .addOption(
     new CommanderOption(
       '--force-cache', 
@@ -128,8 +131,6 @@ web3://0x4e1f41613c9084fdb9e34e11fae9412427480e56=mywebsite.com`)
 program.parse(process.argv);
 const args = program.args;
 const options = program.opts();
-// console.log(args);
-// console.log(options);
 
 
 // Parse the args: The list of served web3:// websites
@@ -179,6 +180,19 @@ if(servedWeb3Websites.length > 1 && servedWeb3Websites.filter(website => !websit
   console.log('Error: When serving multiple web3:// websites, they must all have a DNS domain');
   process.exit(1);
 }
+
+// If letsEncryptEnableHttps is true, ensure the email is set
+if(options.letsEncryptEnableHttps && !options.letsEncryptEmail) {
+  console.log('Error: The email must be set when enabling HTTPS with Let\'s Encrypt');
+  process.exit(1);
+}
+
+// If letsEncryptEnableHttps is true, ensure all served websites have a DNS domain
+if(options.letsEncryptEnableHttps && servedWeb3Websites.filter(website => !website.dnsDomain).length > 0) {
+  console.log('Error: When enabling HTTPS with Let\'s Encrypt, all served web3:// websites must have a DNS domain');
+  process.exit(1);
+}
+
 
 // Printing the list of served websites
 console.log('Serving the following web3:// websites:');
@@ -257,7 +271,14 @@ const web3Client = new Web3Client(chainList)
 
 // Prepare the express app
 const app = express()
-app.get('*', async (req, res) => {
+// All paths but the .well-known/* ones (for SSL certs challenges)
+app.get(/^((?!^\/\.well-known\/).)*$/, async (req, res) => {
+  // If HTTPS is enabled, and this is HTTP, redirect to HTTPS
+  if(options.letsEncryptEnableHttps && req.protocol === 'http') {
+    res.redirect('https://' + req.hostname + req.originalUrl);
+    return;
+  }
+
   // Find the served web3:// website
   // - If there is more than 1 served website, or there is only one, but configured with a DNS domain, 
   //   find the one matching the DNS domain
@@ -363,5 +384,15 @@ app.get('*', async (req, res) => {
   }
 })
 
-console.log('Listening on port ' + options.port)
-app.listen(options.port)
+// HTTP server
+app.listen(options.port, () => {
+  console.log('HTTP Server running on port ' + options.port);
+});
+
+// HTTPS server
+if(options.letsEncryptEnableHttps) {
+  // Get the list of domains to serve
+  const domains = servedWeb3Websites.map(website => website.dnsDomain);
+
+  startHTTPSServer(app, 443, domains, options.letsEncryptEmail)
+}
