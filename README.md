@@ -66,6 +66,9 @@ If you are a website developer: Note that the use of the proposed [ERC-7774](htt
 
 Your website(s) may point to an URL which is not served by your HTTP gateway. In this case, the global web3:// HTTP gateway is used. By default it is `web3gateway.dev`, and can be configured with the `-g, --global-web3-http-gateway-dns-domain` option.
 
+### Port
+
+By default, the gateway listen to the `8080` port. If you wish to change it, you can use the `-p, --port <number>` option.
 
 ## Page alterations by the gateway
 
