@@ -9,7 +9,7 @@ services:
     command: web3://ocweb.eth
     ports:
       - 80:80
-      # - 443:443 # Uncomment if you enable HTTPS
+      # - 443:443 # Uncomment if you enable HTTPS. Note: You must keep the 80 port open as well (used for SSL certificate generation)
     environment:
       NODE_ENV: production
 
