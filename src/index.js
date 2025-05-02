@@ -340,7 +340,7 @@ app.get(/^((?!^\/\.well-known\/).)*$/, async (req, res) => {
         // First chunk: If the content type is text/html, we inject some javascript which 
         // handle conversion of web3:// URLs to http:// gateway URLs
         if(chunkNumber == 0 && contentType && contentType.toLowerCase().startsWith('text/html')) {
-          value = await patchHTMLFile(value, contentEncoding, servedWeb3Websites, options.globalWeb3HttpGatewayDnsDomain)
+          value = await patchHTMLFile(value, contentEncoding, req.get('host'), options.letsEncryptEnableHttps, servedWeb3Websites, options.globalWeb3HttpGatewayDnsDomain)
         }
 
         // Write the chunk to the response
