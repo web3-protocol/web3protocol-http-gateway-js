@@ -1,6 +1,6 @@
 # web3protocol-http-gateway
 
-[![npm version](https://badge.fury.io/js/web3protocol-http-gateway.svg)](https://www.npmjs.com/package/web3curl)
+[![npm version](https://badge.fury.io/js/web3protocol-http-gateway.svg)](https://www.npmjs.com/package/web3protocol-http-gateway)
 
 A HTTP gateway server for your [ERC-6860/4804 `web3://`](https://web3url.io/) website(s).
 
