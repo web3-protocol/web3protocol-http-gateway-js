@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { convertWeb3UrlToGatewayUrl } from './utils.js';
 
 // If the content type is text/html, we do some processing on the data, to basically
 // replace all web3:// URLs into gateway http:// URLs.
@@ -62,14 +63,19 @@ async function patchHTMLFile(buf, contentEncoding, requestHost, serverIsHttps, s
 				// Check if the attribute value is a web3:// URL
 				if (attributeValue.startsWith('web3://')) {
 					// Convert the web3:// URL to a gateway URL
-					const newUrl = convertWeb3UrlToGatewayUrl(attributeValue, requestHost, serverIsHttps, servedWeb3Websites, globalWeb3HttpGatewayDnsDomain);
-					
-					// Replace the attribute value in the tag attributes
-					const newTagAttributes = tagAttributes.replace(attributeValue, newUrl);
-					
-					// Update the tag in the HTML content
-					const newTag = `<${tagName}${newTagAttributes}>`;
-					processedHTML = processedHTML.replace(originalTag, newTag);
+					try {
+						const newUrl = convertWeb3UrlToGatewayUrl(attributeValue, requestHost, serverIsHttps, servedWeb3Websites, globalWeb3HttpGatewayDnsDomain);
+						
+						// Replace the attribute value in the tag attributes
+						const newTagAttributes = tagAttributes.replace(attributeValue, newUrl);
+						
+						// Update the tag in the HTML content
+						const newTag = `<${tagName}${newTagAttributes}>`;
+						processedHTML = processedHTML.replace(originalTag, newTag);
+					}
+					catch (err) {
+						// If we cannot convert the URL, we just leave it as is
+					}
 				}
 			}
 		}
@@ -149,95 +155,6 @@ async function fetchHtmlPatch() {
   return htmlPatch;
 }
 
-// Function to convert web3:// URL to gateway URL
-function convertWeb3UrlToGatewayUrl(web3Url, requestHost, serverIsHttps, servedWeb3Websites, globalWeb3HttpGatewayDnsDomain) {
-	// Parse the URL
-	const re = /^(?<protocol>[^:]+):\/\/(?<hostname>[^:\/?#]+)(:(?<chainId>[1-9][0-9]*))?(?<pathQuery>(?<path>\/[^?#]*)?([?](?<query>[^#]*))?)?(#(?<fragment>.*))?$/;
-	const match = web3Url.match(re);
-	
-	if (!match || !match.groups) {
-		// Invalid web3:// URL
-		console.error(`Invalid web3 URL: ${web3Url}`);
-		return web3Url;
-	}
-	
-	const urlMainParts = match.groups;
-	
-	// Check protocol name
-	const webProtocol = urlMainParts.protocol;
-	if (webProtocol !== 'web3' && webProtocol !== 'w3') {
-		// Bad protocol name
-		console.error(`Invalid web3 URL protocol: ${web3Url}`);
-		return web3Url;
-	}
-	
-	// Search if the hostname+chainId is in the list of web3 addresses handled by this gateway
-	const gatewayWeb3Websites = servedWeb3Websites.map(website => {
-		return {
-			web3HostnameAndChain: website.web3UrlHostname + (website.web3UrlChain > 1 ? `:${website.web3UrlChain}` : ''),
-			dnsDomain: website.dnsDomain
-		};
-	});
-	const gatewayWeb3Website = gatewayWeb3Websites.find(function(gatewayWeb3Website) {
-		return gatewayWeb3Website.web3HostnameAndChain.toLowerCase() === urlMainParts.hostname.toLowerCase() + (urlMainParts.chainId ? ':' + urlMainParts.chainId : '');
-	});
-	// If we found one, build and return the URL
-	if(gatewayWeb3Website) {
-		// Explode requestHost into hostname and port
-		const requestHostParts = requestHost.split(':');
-		const requestHostHostname = requestHostParts[0];
-		const requestHostPort = requestHostParts[1];
-		// If there is no DNS domain configured, use the current one
-		const gateway = (gatewayWeb3Website.dnsDomain ? gatewayWeb3Website.dnsDomain : requestHostHostname) + (requestHostPort ? ':' + requestHostPort : '');
-		const gatewayUrl = (serverIsHttps ? 'https:' : 'http:') + "//" + gateway + (urlMainParts.path ?? "");
-		return gatewayUrl;
-	}
 
-	// If this web3 address is not handled by this gateway, use the global one, if we have one configured
-	if(!globalWeb3HttpGatewayDnsDomain) {
-		return null;
-	}
-
-	// Get subdomain components
-	let gateway = globalWeb3HttpGatewayDnsDomain;
-	const subDomains = [];
-	
-	// Is the contract an ethereum address?
-	const isEthAddress = /^0x[0-9a-fA-F]{40}$/.test(urlMainParts.hostname);
-	
-	if (isEthAddress) {
-		subDomains.push(urlMainParts.hostname);
-		
-		if (urlMainParts.chainId) {
-			subDomains.push(urlMainParts.chainId);
-		} else {
-			subDomains.push('1');
-		}
-	} else {
-		// It is a domain name
-		if (urlMainParts.hostname.endsWith('.eth') && !urlMainParts.chainId) {
-			subDomains.push(urlMainParts.hostname);
-			subDomains.push('1');
-		} else {
-			subDomains.push(urlMainParts.hostname);
-			
-			if (urlMainParts.chainId) {
-				subDomains.push(urlMainParts.chainId);
-			}
-		}
-	}
-	
-	let path = urlMainParts.path || '/';
-	let query = urlMainParts.query ? `?${urlMainParts.query}` : '';
-	let fragment = urlMainParts.fragment ? `#${urlMainParts.fragment}` : '';
-	
-	const protocol = 'http';
-	if (serverIsHttps) {
-		protocol = 'https';
-	}
-	
-	const gatewayUrl = `${protocol}://${subDomains.join('.')}.${gateway}${path}${query}${fragment}`;
-	return gatewayUrl;
-}
 
 export { patchHTMLFile };

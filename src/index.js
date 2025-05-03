@@ -10,6 +10,7 @@ import winston from 'winston'
 import { patchHTMLFile } from './patch.js';
 import { setPageCache, getPageCache, hasPageCache, deletePageCache } from './page-cache.js';
 import { startHTTPSServer } from './letsencrypt.js';
+import { convertWeb3UrlToGatewayUrl } from './utils.js';
 
 
 // Get the package.json file
@@ -316,9 +317,17 @@ app.get(/^((?!^\/\.well-known\/).)*$/, async (req, res) => {
 
     // Set the HTTP Code
     res.status(fetchedWeb3Url.httpCode);
-    
+
     // Set the response headers
     Object.entries(fetchedWeb3Url.httpHeaders).forEach(([key, value]) => {
+      // If header is "Location", and value is a web3:// URL, convert it to a gateway URL
+      if(key.toLowerCase() === 'location' && value.startsWith('web3://')) {
+        try {
+          value = convertWeb3UrlToGatewayUrl(value, req.get('host'), options.letsEncryptEnableHttps, servedWeb3Websites, options.globalWeb3HttpGatewayDnsDomain);
+        } catch (err) {
+          // If we cannot convert the URL, we just leave it as is
+        }
+      }
       res.setHeader(key, value);
     });
 
