@@ -39,6 +39,7 @@ async function patchHTMLFile(buf, contentEncoding, requestHost, serverIsHttps, s
 		"embed": "src",
 		"input": "src",
 		"object": "data",
+		"image": "href", // SVG
 	};
 
 	// Lookup each tag in the HTML document, process their attributes
